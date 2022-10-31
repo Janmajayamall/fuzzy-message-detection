@@ -1,11 +1,10 @@
-use std::{hash, ops::Mul};
-
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_POINT, ristretto::RistrettoPoint, scalar::Scalar,
     traits::MultiscalarMul,
 };
 use rand_core::{CryptoRng, OsRng, RngCore};
 use sha3::{Digest, Sha3_256, Sha3_512};
+use std::ops::Mul;
 
 struct TaggingKey(Vec<RistrettoPoint>);
 struct DetectionKey(Vec<Scalar>);
@@ -174,5 +173,31 @@ mod tests {
 
         let matches = test(tag, detection_key2);
         assert!(!matches);
+    }
+
+    #[test]
+    fn false_positive() {
+        let gamma = 10;
+        let n_log = 3usize;
+        let mut rng = OsRng::default();
+
+        let key = Key::generate(gamma, &mut rng);
+
+        let mut false_positives = 0;
+        let total = 1000;
+        for i in 0..total {
+            let key2 = Key::generate(gamma, &mut rng);
+            let tag = tag(&key2.tagging_key(), &mut rng);
+            assert!(test(tag.clone(), key2.extract_key(n_log)));
+
+            if test(tag, key.extract_key(n_log)) {
+                false_positives += 1;
+            }
+        }
+
+        println!(
+            "False positive rate: {}",
+            false_positives as f64 / total as f64
+        );
     }
 }
